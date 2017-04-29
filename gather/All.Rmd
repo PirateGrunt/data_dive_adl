@@ -1,0 +1,43 @@
+---
+title: "All"
+params: 
+  inputDir: "gather/"
+  thisDir:  "gather/"
+  outputDir: "gathered/"
+  fileStem: "All"
+---
+
+```{r KnitrOpts, echo=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('../'))
+knitr::opts_chunk$set(echo=TRUE, message=TRUE, warning=TRUE, error=TRUE)
+```
+
+```{r}
+library(readr)
+```
+
+We'll start by gathering anything with a .CSV and .XLS* in the '_CLEAN_DATA' folder.
+
+```{r}
+strPath <- 'gather/_CLEAN DATA/'
+data_files <- list.files(path = strPath, pattern = '*.csv', recursive = TRUE, full.names = FALSE)
+# data_files <- paste0(data_files
+
+lapply(data_files, function(x) {
+  a_df <- readr::read_csv(paste0(strPath, x))
+  # assign the bare filename as the name of the data frame with a "df" prefix
+  strVarName <- paste0("df", gsub(".csv", "", x))
+  assign(strVarName, a_df, envir = .GlobalEnv)
+  # strVarName
+})
+```
+
+```{r ListObjects}
+lstObjects <- represtools::ListObjects()
+represtools::DescribeObjects(represtools::NamesToObjects(lstObjects))
+```
+
+```{r Save}
+save(file = represtools::OutputFile(params)
+     , list = lstObjects)
+```
