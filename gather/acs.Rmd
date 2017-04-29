@@ -19,13 +19,50 @@ library(tibble)
 library(tidyr)
 ```
 
+To extract this data, you'll need an API key. 
+
+## Geo
+
+We'll be looking at data at the county level for each state. This will be 3,220 rows.
+
+```{r}
+geo <- geo.make(state = '*', county="*")
+```
+
+```{r}
+convert_to_df <- function(obj){
+  df <- data.frame(estimate(obj)) %>% 
+    rownames_to_column("county_state") %>% 
+    separate("county_state", into = c("county", "state"), sep=",")
+  df
+}
+```
+
+## Demographics of interest
+
 First, we'll try to identify some interesting columns. We're going to search for these broad categories:
 
+* Population
 * Age
 * Education
 * Income
 * Unemployment
 * Size and composition of household
+
+## Population
+
+```{r}
+pop_cols <- acs.lookup(keyword="pop", endyear=2015)
+dfPopulationCols <- education_cols@results %>% 
+  dplyr::filter(grepl("(^|\\W)[Pp]opulation($|\\W)", variable.name))
+```
+
+```{r}
+obj_pop <- acs.fetch(endyear = 2015, span = 5, geography = geo,
+                    table.number = "B16008", col.names = "pretty")
+dfPop <- obj_pop %>% 
+  convert_to_df()
+```
 
 ## Age
 
@@ -39,12 +76,42 @@ dfAgeCols <- age_cols@results %>%
 View(dfAgeCols)
 ```
 
-
 ```{r results = 'asis'}
 pander::pander(dfAgeCols %>% head())
 ```
 
 We settle on `B01002`, which has median age by gender and in total and `B01002A` which has median age by white alone.
+
+```{r}
+obj_age <- acs.fetch(endyear = 2015, span = 5, geography = geo,
+                    table.number = "B01002", col.names = "pretty")
+dfAge1 <- obj_age %>% 
+  convert_to_df()
+
+obj_age2 <- acs.fetch(endyear = 2015, span = 5, geography = geo,
+                    table.number = "B01002A", col.names = "pretty")
+dfAge2 <- obj_age2 %>% 
+  convert_to_df()
+names(dfAge2) <- c("county", "state", paste0(setdiff(names(dfAge2), c("county", "state")), ".White.Alone"))
+
+dfAge <- dplyr::full_join(dfAge1, dfAge2, by = c("county", "state"))
+```
+
+## Education
+
+```{r}
+education_cols <- acs.lookup(keyword="pop", endyear=2015)
+dfEducationCols <- education_cols@results %>% 
+  dplyr::filter(grepl("(^|\\W)education($|\\W)", variable.name))
+```
+
+```{r eval=FALSE}
+View(dfEducationCols)
+```
+
+```{r results = 'asis'}
+pander::pander(dfEducationCols %>% head())
+```
 
 ```{r}
 geo <- geo.make(state = '*', county="*")
@@ -64,8 +131,6 @@ names(dfAge2) <- c("county", "state", paste0(setdiff(names(dfAge2), c("county", 
 dfAge <- dplyr::full_join(dfAge1, dfAge2, by = c("county", "state"))
 ```
 
-## Education
-
 ## 
 
 ```{r ListObjects}
@@ -74,6 +139,8 @@ represtools::DescribeObjects(represtools::NamesToObjects(lstObjects))
 ```
 
 ```{r Save}
+dfAge %>% write.csv(paste0(params$outputDir, "age.csv"), row.names = FALSE)
+dfPop %>% write.csv(paste0(params$outputDir, "population.csv"), row.names = FALSE)
 save(file = represtools::OutputFile(params)
      , list = lstObjects)
 ```
