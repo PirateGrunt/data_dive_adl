@@ -1,0 +1,79 @@
+---
+title: "acs"
+params: 
+  inputDir: "gather/"
+  thisDir:  "gather/"
+  outputDir: "gathered/"
+  fileStem: "acs"
+---
+
+```{r KnitrOpts, echo=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('../'))
+knitr::opts_chunk$set(echo=TRUE, message=TRUE, warning=TRUE, error=TRUE)
+```
+
+```{r}
+library(dplyr)
+library(acs)
+library(tibble)
+library(tidyr)
+```
+
+First, we'll try to identify some interesting columns. We're going to search for these broad categories:
+
+* Age
+* Education
+* Income
+* Unemployment
+* Size and composition of household
+
+## Age
+
+```{r}
+age_cols <- acs.lookup(keyword="age", endyear=2015)
+dfAgeCols <- age_cols@results %>% 
+  dplyr::filter(grepl("(^|\\W)age($|\\W)", variable.name))
+```
+
+```{r eval=FALSE}
+View(dfAgeCols)
+```
+
+
+```{r results = 'asis'}
+pander::pander(dfAgeCols %>% head())
+```
+
+We settle on `B01002`, which has median age by gender and in total and `B01002A` which has median age by white alone.
+
+```{r}
+geo <- geo.make(state = '*', county="*")
+obj_age <- acs.fetch(endyear = 2015, span = 5, geography = geo,
+                    table.number = "B01002", col.names = "pretty")
+dfAge1 <- data.frame(estimate(obj_age)) %>% 
+  rownames_to_column("county_state") %>% 
+  separate("county_state", into = c("county", "state"), sep=",")
+
+obj_age2 <- acs.fetch(endyear = 2015, span = 5, geography = geo,
+                    table.number = "B01002A", col.names = "pretty")
+dfAge2 <- data.frame(estimate(obj_age)) %>% 
+  rownames_to_column("county_state") %>% 
+  separate("county_state", into = c("county", "state"), sep=",")
+names(dfAge2) <- c("county", "state", paste0(setdiff(names(dfAge2), c("county", "state")), ".White.Alone"))
+
+dfAge <- dplyr::full_join(dfAge1, dfAge2, by = c("county", "state"))
+```
+
+## Education
+
+## 
+
+```{r ListObjects}
+lstObjects <- represtools::ListObjects()
+represtools::DescribeObjects(represtools::NamesToObjects(lstObjects))
+```
+
+```{r Save}
+save(file = represtools::OutputFile(params)
+     , list = lstObjects)
+```
